@@ -1,0 +1,109 @@
+{
+  "events": [
+    {
+      "id": "ukraine_2022",
+      "title": "Invasão russa à Ucrânia",
+      "date": "2022-02-24",
+      "region": "Europa Oriental",
+      "country_codes": ["UA", "RU"],
+      "lat": 49.0,
+      "lon": 32.0,
+      "event_type": "armed_conflict",
+      "intensity_score": 9.5,
+      "description": "Russia lança invasão militar em larga escala contra a Ucrânia, desencadeando conflito armado com impacto imediato em cadeias de suprimento de grãos, fertilizantes e energia na Europa.",
+      "commodities_affected": ["wheat", "corn", "natural_gas", "fertilizers", "sunflower_oil"],
+      "verified_outcomes": {
+        "wheat_price_change_30d": "+32%",
+        "natural_gas_eu_change_30d": "+55%",
+        "corn_price_change_30d": "+18%"
+      },
+      "source": "FAO, 2022; World Bank, 2022"
+    },
+    {
+      "id": "gulf_war_1990",
+      "title": "Invasão do Kuwait pelo Iraque",
+      "date": "1990-08-02",
+      "region": "Oriente Médio",
+      "country_codes": ["IQ", "KW"],
+      "lat": 29.3,
+      "lon": 47.7,
+      "event_type": "armed_conflict",
+      "intensity_score": 9.0,
+      "description": "Iraque invade e ocupa o Kuwait, desencadeando crise no fornecimento global de petróleo e levando a intervenção internacional liderada pelos EUA.",
+      "commodities_affected": ["crude_oil", "natural_gas"],
+      "verified_outcomes": {
+        "crude_oil_change_30d": "+47%"
+      },
+      "source": "Hamilton, 1994; EIA, 2023"
+    },
+    {
+      "id": "arab_oil_embargo_1973",
+      "title": "Embargo de petróleo árabe",
+      "date": "1973-10-17",
+      "region": "Oriente Médio / Norte da África",
+      "country_codes": ["SA", "EG", "SY"],
+      "lat": 24.0,
+      "lon": 45.0,
+      "event_type": "economic_sanction",
+      "intensity_score": 9.2,
+      "description": "Países da OPEP declaram embargo ao fornecimento de petróleo para nações que apoiaram Israel na Guerra do Yom Kippur, quadruplicando o preço do barril em meses.",
+      "commodities_affected": ["crude_oil"],
+      "verified_outcomes": {
+        "crude_oil_change_90d": "+300%"
+      },
+      "source": "Hamilton, 1983; Kindleberger, 1986"
+    },
+    {
+      "id": "iran_sanctions_2012",
+      "title": "Sanções internacionais ao Irã",
+      "date": "2012-01-23",
+      "region": "Oriente Médio",
+      "country_codes": ["IR"],
+      "lat": 32.4,
+      "lon": 53.7,
+      "event_type": "economic_sanction",
+      "intensity_score": 7.5,
+      "description": "União Europeia e EUA impõem sanções amplas ao programa nuclear iraniano, restringindo exportações de petróleo e criando pressão sobre preços globais de energia.",
+      "commodities_affected": ["crude_oil", "natural_gas"],
+      "verified_outcomes": {
+        "crude_oil_change_30d": "+8%"
+      },
+      "source": "EIA, 2023"
+    },
+    {
+      "id": "covid_lockdowns_2020",
+      "title": "Lockdowns globais por COVID-19",
+      "date": "2020-03-11",
+      "region": "Global",
+      "country_codes": [],
+      "lat": 0.0,
+      "lon": 0.0,
+      "event_type": "institutional_disruption",
+      "intensity_score": 8.8,
+      "description": "OMS declara pandemia de COVID-19. Lockdowns globais colapsam demanda por petróleo e interrompem cadeias de suprimento de múltiplas commodities.",
+      "commodities_affected": ["crude_oil", "aluminum", "copper"],
+      "verified_outcomes": {
+        "crude_oil_change_30d": "-55%",
+        "copper_change_30d": "-15%"
+      },
+      "source": "World Bank, 2022"
+    },
+    {
+      "id": "hormuz_tensions_2019",
+      "title": "Tensões no Estreito de Ormuz",
+      "date": "2019-07-04",
+      "region": "Oriente Médio / Golfo Pérsico",
+      "country_codes": ["IR", "GB"],
+      "lat": 26.5,
+      "lon": 56.3,
+      "event_type": "military_tension",
+      "intensity_score": 7.0,
+      "description": "Série de incidentes envolvendo navios petroleiros no Estreito de Ormuz, incluindo captura de tanker britânico pelo Irã, elevando prêmio de risco no petróleo.",
+      "commodities_affected": ["crude_oil"],
+      "verified_outcomes": {
+        "crude_oil_change_7d": "+4%"
+      },
+      "source": "EIA, 2023"
+    }
+  ]
+}

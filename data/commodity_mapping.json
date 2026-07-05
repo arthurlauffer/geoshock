@@ -1,0 +1,51 @@
+{
+  "armed_conflict": {
+    "regions": {
+      "Eastern Europe": ["wheat", "corn", "sunflower_oil", "fertilizers", "natural_gas"],
+      "Middle East": ["crude_oil", "natural_gas"],
+      "Sub-Saharan Africa": ["gold", "copper", "cobalt"],
+      "Latin America": ["soybeans", "copper", "lithium"],
+      "East Asia": ["rare_earths", "electronics_commodities"]
+    },
+    "default": ["crude_oil", "gold"]
+  },
+  "economic_sanction": {
+    "regions": {
+      "Middle East": ["crude_oil", "natural_gas"],
+      "Russia": ["natural_gas", "wheat", "fertilizers", "aluminum"],
+      "China": ["rare_earths", "electronics_commodities"]
+    },
+    "default": ["crude_oil", "gold"]
+  },
+  "military_tension": {
+    "regions": {
+      "Strait of Hormuz": ["crude_oil"],
+      "South China Sea": ["crude_oil", "rare_earths"],
+      "Taiwan Strait": ["rare_earths", "electronics_commodities"]
+    },
+    "default": ["crude_oil"]
+  },
+  "diplomatic_crisis": {
+    "default": ["crude_oil", "gold"]
+  },
+  "institutional_disruption": {
+    "default": ["crude_oil", "copper", "aluminum", "wheat"]
+  },
+  "trade_restriction": {
+    "default": ["soybeans", "wheat", "rare_earths", "aluminum"]
+  },
+  "infrastructure_attack": {
+    "regions": {
+      "Middle East": ["crude_oil", "natural_gas"],
+      "Eastern Europe": ["natural_gas", "crude_oil"]
+    },
+    "default": ["crude_oil", "natural_gas"]
+  },
+  "territorial_dispute": {
+    "regions": {
+      "South China Sea": ["crude_oil", "rare_earths"],
+      "Eastern Europe": ["wheat", "corn", "natural_gas"]
+    },
+    "default": ["crude_oil", "gold"]
+  }
+}

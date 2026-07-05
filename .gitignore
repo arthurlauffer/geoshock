@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.env
+data/chroma_db/
+data/_fred_cache/
+data/_gdelt_cache/
+web/node_modules/
+web/.next/
+web/out/
+.DS_Store
