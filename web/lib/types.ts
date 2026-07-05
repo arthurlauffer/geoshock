@@ -14,6 +14,7 @@ export interface GeoEvent {
   commodities_affected: string[];
   source: string;
   verified_outcomes?: Record<string, string>;
+  kind?: "curated" | "live";
 }
 
 export interface SimilarEvent {
@@ -83,3 +84,20 @@ export interface Health {
 }
 
 export type InputMode = "historical" | "manual" | "gdelt";
+
+export interface Region {
+  id: string;
+  name: string;
+  name_en: string;
+  center: { lat: number; lon: number };
+  countries: string[];
+}
+
+export interface RegionDetail {
+  region: Region & { gdelt_query?: string };
+  summary: string;
+  risk_level: "alto" | "médio" | "baixo";
+  live_events: GeoEvent[];
+  commodities_at_risk: string[];
+  meta: { offline: boolean; n_live: number };
+}

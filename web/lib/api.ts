@@ -1,6 +1,6 @@
 // Cliente HTTP do frontend para a API GeoShock (FastAPI).
 
-import type { AnalyzeResponse, GeoEvent, Health } from "./types";
+import type { AnalyzeResponse, GeoEvent, Health, Region, RegionDetail } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -22,6 +22,20 @@ export async function fetchEvents(): Promise<GeoEvent[]> {
 
 export async function fetchEventTypes(): Promise<Record<string, string>> {
   return getJSON<Record<string, string>>("/api/event_types");
+}
+
+export async function fetchRegions(): Promise<Region[]> {
+  const data = await getJSON<{ regions: Region[] }>("/api/regions");
+  return data.regions;
+}
+
+export async function fetchMapEvents(): Promise<GeoEvent[]> {
+  const data = await getJSON<{ events: GeoEvent[] }>("/api/map_events");
+  return data.events;
+}
+
+export async function fetchRegion(id: string): Promise<RegionDetail> {
+  return getJSON<RegionDetail>(`/api/region/${id}`);
 }
 
 export async function searchGdelt(

@@ -13,6 +13,7 @@ import {
   fetchEvents,
   fetchEventTypes,
   fetchHealth,
+  fetchMapEvents,
   searchGdelt,
 } from "@/lib/api";
 import type {
@@ -30,6 +31,7 @@ export default function Home() {
   const [health, setHealth] = useState<Health | null>(null);
   const [events, setEvents] = useState<GeoEvent[]>([]);
   const [eventTypes, setEventTypes] = useState<Record<string, string>>({});
+  const [mapEvents, setMapEvents] = useState<GeoEvent[]>([]);
   const [mode, setMode] = useState<InputMode>("historical");
 
   const [selected, setSelected] = useState<GeoEvent | null>(null);
@@ -44,14 +46,16 @@ export default function Home() {
   useEffect(() => {
     (async () => {
       try {
-        const [h, evs, types] = await Promise.all([
+        const [h, evs, types, mapEvs] = await Promise.all([
           fetchHealth(),
           fetchEvents(),
           fetchEventTypes(),
+          fetchMapEvents(),
         ]);
         setHealth(h);
         setEvents(evs);
         setEventTypes(types);
+        setMapEvents(mapEvs);
         if (evs.length > 0) setSelected(evs[0]);
       } catch (e) {
         setError("Não consegui falar com o backend na porta 8000. Ele está rodando?");
@@ -112,18 +116,20 @@ export default function Home() {
                 <GlobeHemisphereWest size={14} className="text-[color:var(--accent)]" />
                 Distribuição geográfica
               </p>
-              {result && (
-                <div className="flex gap-4 text-xs num text-zinc-400">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#fb7185]" /> Evento
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#e9a94b]" /> Análogos
-                  </span>
-                </div>
-              )}
+              <div className="flex gap-4 text-xs num text-zinc-400">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#fb7185]" /> Em foco
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#7dd3fc]" /> Curados
+                </span>
+              </div>
             </div>
-            <WorldMap event={result?.event ?? selected} analogs={result?.similar ?? []} />
+            <WorldMap
+              events={mapEvents}
+              focused={result?.event ?? selected}
+              onSelectEvent={(e) => setSelected(e)}
+            />
           </section>
 
           <section className="panel p-5 min-h-[340px]">
