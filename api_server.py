@@ -23,9 +23,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from modules import briefing_generator, collector, impact_analyzer, preprocessor, regions as regions_mod
+from modules import region_summarizer
 from modules.briefing_generator import LLMClient
 from modules.similarity_engine import SimilarityEngine
 from utils.fred_client import FredClient
+from utils.geocoder import geocode_event
 from utils.validators import EVENT_TYPES, ValidationError
 
 load_dotenv()
@@ -95,6 +97,37 @@ def list_regions() -> dict[str, Any]:
 @app.get("/api/map_events")
 def map_events() -> dict[str, Any]:
     return {"events": regions_mod.curated_map_events()}
+
+
+@app.get("/api/region/{region_id}")
+def region_detail(region_id: str) -> dict[str, Any]:
+    region = regions_mod.get_region(region_id)
+    if region is None:
+        raise HTTPException(status_code=404, detail=f"Região desconhecida: {region_id}")
+
+    articles = _collector.search_gdelt(region["gdelt_query"], max_records=12)
+    live_events: list[dict[str, Any]] = []
+    for art in articles:
+        if not art.get("title"):
+            continue
+        ev = collector.article_to_event(art)
+        # Sem país no artigo: usa o 1º país da região como fallback de coordenada.
+        if not ev.get("country_codes"):
+            ev["country_codes"] = region["countries"][:1]
+        ev = geocode_event(ev)
+        ev["kind"] = "live"
+        live_events.append(ev)
+
+    commodities = region_summarizer.aggregate_commodities(live_events, region)
+    summary = region_summarizer.summarize_region(region, live_events, commodities)
+    return {
+        "region": region,
+        "summary": summary["summary"],
+        "risk_level": summary["risk_level"],
+        "live_events": live_events,
+        "commodities_at_risk": commodities,
+        "meta": {"offline": summary["offline"], "n_live": len(live_events)},
+    }
 
 
 # --------------------------------------------------------------------------- #
