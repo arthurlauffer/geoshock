@@ -22,7 +22,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from modules import briefing_generator, collector, impact_analyzer, preprocessor
+from modules import briefing_generator, collector, impact_analyzer, preprocessor, regions as regions_mod
 from modules.briefing_generator import LLMClient
 from modules.similarity_engine import SimilarityEngine
 from utils.fred_client import FredClient
@@ -85,6 +85,16 @@ def event_types() -> dict[str, str]:
 @app.get("/api/events")
 def list_events() -> dict[str, Any]:
     return {"events": _collector.load_historical_events()}
+
+
+@app.get("/api/regions")
+def list_regions() -> dict[str, Any]:
+    return {"regions": regions_mod.load_regions()}
+
+
+@app.get("/api/map_events")
+def map_events() -> dict[str, Any]:
+    return {"events": regions_mod.curated_map_events()}
 
 
 # --------------------------------------------------------------------------- #
