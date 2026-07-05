@@ -31,9 +31,6 @@ def curated_map_events() -> list[dict[str, Any]]:
     events = []
     for ev in Collector().load_historical_events():
         geo = geocode_event(ev)
-        # Filtra eventos sem coordenadas válidas (0.0, 0.0)
-        if geo.get("lat") == 0.0 and geo.get("lon") == 0.0:
-            continue
         geo.pop("embedding", None)
         geo["kind"] = "curated"
         events.append(geo)

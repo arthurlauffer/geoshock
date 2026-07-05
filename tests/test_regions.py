@@ -17,13 +17,14 @@ def test_get_region_known_and_unknown():
 
 def test_curated_map_events_all_geocoded():
     events = regions.curated_map_events()
-    assert len(events) >= 5
+    assert len(events) >= 6
+    geocoded = [e for e in events if e["lat"] != 0.0 or e["lon"] != 0.0]
+    assert len(geocoded) >= 5  # todos exceto o evento global (COVID) sao geocodificados
     for ev in events:
-        assert ev["lat"] != 0.0 or ev["lon"] != 0.0
         assert "embedding" not in ev
 
 
 def test_endpoint_functions():
     import api_server
     assert len(api_server.list_regions()["regions"]) == 8
-    assert len(api_server.map_events()["events"]) >= 5
+    assert len(api_server.map_events()["events"]) >= 6
