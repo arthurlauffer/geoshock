@@ -14,6 +14,8 @@ import {
   fetchEventTypes,
   fetchHealth,
   fetchMapEvents,
+  fetchRegion,
+  fetchRegions,
   searchGdelt,
 } from "@/lib/api";
 import type {
@@ -21,8 +23,11 @@ import type {
   GeoEvent,
   Health,
   InputMode,
+  Region,
+  RegionDetail,
 } from "@/lib/types";
 import AnalysisPanel from "@/components/AnalysisPanel";
+import RegionPanel from "@/components/RegionPanel";
 
 // O mapa usa APIs de browser (SVG/medições), carrega só no cliente.
 const WorldMap = dynamic(() => import("@/components/WorldMap"), { ssr: false });
@@ -41,27 +46,53 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [regionDetail, setRegionDetail] = useState<RegionDetail | null>(null);
+  const [regionLoading, setRegionLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<"simple" | "analyst">("simple");
+
   const runId = useRef(0);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("geoshock_view");
+    if (saved === "simple" || saved === "analyst") setViewMode(saved);
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("geoshock_view", viewMode);
+  }, [viewMode]);
 
   useEffect(() => {
     (async () => {
       try {
-        const [h, evs, types, mapEvs] = await Promise.all([
+        const [h, evs, types, mapEvs, regs] = await Promise.all([
           fetchHealth(),
           fetchEvents(),
           fetchEventTypes(),
           fetchMapEvents(),
+          fetchRegions(),
         ]);
         setHealth(h);
         setEvents(evs);
         setEventTypes(types);
         setMapEvents(mapEvs);
+        setRegions(regs);
         if (evs.length > 0) setSelected(evs[0]);
       } catch (e) {
         setError("Não consegui falar com o backend na porta 8000. Ele está rodando?");
         console.error(e);
       }
     })();
+  }, []);
+
+  const openRegion = useCallback(async (id: string) => {
+    setRegionLoading(true);
+    setSelected(null); // sai do modo evento
+    setResult(null);
+    try {
+      setRegionDetail(await fetchRegion(id));
+    } finally {
+      setRegionLoading(false);
+    }
   }, []);
 
   const runAnalysis = useCallback(
@@ -91,9 +122,14 @@ export default function Home() {
     if (selected) runAnalysis(selected, nAnalogs);
   }, [selected, nAnalogs, runAnalysis]);
 
+  const selectEvent = useCallback((e: GeoEvent | null) => {
+    setRegionDetail(null); // sai do modo região
+    setSelected(e);
+  }, []);
+
   return (
     <div className="min-h-[100dvh] px-4 py-5 md:px-8 md:py-7 flex flex-col gap-5 max-w-[1480px] mx-auto w-full">
-      <Header health={health} />
+      <Header health={health} viewMode={viewMode} setViewMode={setViewMode} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start">
         <Sidebar
@@ -102,11 +138,13 @@ export default function Home() {
           events={events}
           eventTypes={eventTypes}
           selected={selected}
-          setSelected={setSelected}
+          setSelected={selectEvent}
           nAnalogs={nAnalogs}
           setNAnalogs={setNAnalogs}
           onRegenerate={() => selected && runAnalysis(selected, nAnalogs)}
           loading={loading}
+          regions={regions}
+          onSelectRegion={openRegion}
         />
 
         <div className="grid grid-cols-1 xl:grid-cols-[1.02fr_0.98fr] gap-5 items-start">
@@ -128,7 +166,7 @@ export default function Home() {
             <WorldMap
               events={mapEvents}
               focused={result?.event ?? selected}
-              onSelectEvent={(e) => setSelected(e)}
+              onSelectEvent={(e) => selectEvent(e)}
             />
           </section>
 
@@ -138,12 +176,14 @@ export default function Home() {
                 <Warning size={18} className="mt-0.5 shrink-0" />
                 <span>{error}</span>
               </div>
-            ) : loading ? (
+            ) : regionLoading || loading ? (
               <AnalysisSkeleton />
             ) : result ? (
-              <AnalysisPanel data={result} />
+              viewMode === "analyst" ? <AnalysisPanel data={result} /> : <SimpleBriefing data={result} />
+            ) : regionDetail ? (
+              <RegionPanel detail={regionDetail} onSelectEvent={(e) => selectEvent(e)} />
             ) : (
-              <p className="text-zinc-400 text-sm">Selecione um evento para gerar a análise.</p>
+              <p className="text-zinc-400 text-sm">Escolha uma região ou um evento para começar.</p>
             )}
           </section>
         </div>
@@ -155,7 +195,15 @@ export default function Home() {
 }
 
 // --------------------------------------------------------------------------- //
-function Header({ health }: { health: Health | null }) {
+function Header({
+  health,
+  viewMode,
+  setViewMode,
+}: {
+  health: Health | null;
+  viewMode: "simple" | "analyst";
+  setViewMode: (m: "simple" | "analyst") => void;
+}) {
   return (
     <header className="panel px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
       <div className="flex items-center gap-3">
@@ -169,10 +217,20 @@ function Header({ health }: { health: Health | null }) {
           </p>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <StatusChip on={!!health?.llm_live} label={`${health?.llm_provider ?? "llm"} ${health?.llm_live ? "conectado" : "offline"}`} />
-        <StatusChip on={!!health?.fred_live} label={`FRED ${health?.fred_live ? "conectado" : "offline"}`} />
-        <StatusChip on label="GDELT aberta" />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="seg w-auto">
+          <button className={`seg-item ${viewMode === "simple" ? "seg-active" : ""}`} onClick={() => setViewMode("simple")}>
+            Simples
+          </button>
+          <button className={`seg-item ${viewMode === "analyst" ? "seg-active" : ""}`} onClick={() => setViewMode("analyst")}>
+            Analista
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <StatusChip on={!!health?.llm_live} label={`${health?.llm_provider ?? "llm"} ${health?.llm_live ? "conectado" : "offline"}`} />
+          <StatusChip on={!!health?.fred_live} label={`FRED ${health?.fred_live ? "conectado" : "offline"}`} />
+          <StatusChip on label="GDELT aberta" />
+        </div>
       </div>
     </header>
   );
@@ -199,13 +257,26 @@ interface SidebarProps {
   setNAnalogs: (n: number) => void;
   onRegenerate: () => void;
   loading: boolean;
+  regions: Region[];
+  onSelectRegion: (id: string) => void;
 }
 
 function Sidebar(props: SidebarProps) {
-  const { mode, setMode, events, eventTypes, selected, setSelected, nAnalogs, setNAnalogs, onRegenerate, loading } = props;
+  const { mode, setMode, events, eventTypes, selected, setSelected, nAnalogs, setNAnalogs, onRegenerate, loading, regions, onSelectRegion } = props;
 
   return (
     <aside className="panel p-5 flex flex-col gap-6 lg:sticky lg:top-5">
+      <div>
+        <p className="eyebrow mb-2">Regiões</p>
+        <div className="grid grid-cols-2 gap-1.5">
+          {regions.map((r) => (
+            <button key={r.id} className="seg-item" onClick={() => onSelectRegion(r.id)}>
+              {r.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div>
         <p className="eyebrow mb-2">Fonte do evento</p>
         <div className="seg">
@@ -441,5 +512,23 @@ function Footer() {
       GeoShock · Protótipo acadêmico · FAE Centro Universitário, 2026 · Análise
       educacional, não constitui recomendação de investimento.
     </footer>
+  );
+}
+
+// --------------------------------------------------------------------------- //
+function SimpleBriefing({ data }: { data: AnalyzeResponse }) {
+  const first = data.briefing.markdown.split("\n").find((l) => l.trim() && !l.startsWith("#")) ?? "";
+  return (
+    <div className="reveal flex flex-col gap-4">
+      <h2 className="text-lg font-semibold">{data.event.title}</h2>
+      <p className="text-sm text-zinc-300 leading-relaxed">{first}</p>
+      <div>
+        <p className="eyebrow mb-2">Commodities em risco</p>
+        <div className="flex flex-wrap gap-2">
+          {data.commodities.slice(0, 5).map((c) => (<span key={c} className="chip">{c}</span>))}
+        </div>
+      </div>
+      <p className="text-xs text-zinc-500">Ative o modo Analista para ver análogos, variações e detalhes.</p>
+    </div>
   );
 }
