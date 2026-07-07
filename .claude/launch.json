@@ -6,6 +6,13 @@
       "runtimeExecutable": "./venv/bin/python",
       "runtimeArgs": ["-m", "streamlit", "run", "app.py", "--server.port", "8501", "--server.headless", "true"],
       "port": 8501
+    },
+    {
+      "name": "geoshock-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "-p", "3100"],
+      "cwd": "web",
+      "port": 3100
     }
   ]
 }
