@@ -41,7 +41,7 @@ export default function RegionPanel({
           <div className="flex flex-col">
             {detail.live_events.map((e, i) => (
               <button
-                key={e.id}
+                key={`${e.id}_${i}`}
                 onClick={() => onSelectEvent(e)}
                 className={`text-left py-2.5 px-2 rounded-lg hover:bg-white/[0.03] transition ${i > 0 ? "border-t border-white/8" : ""}`}
               >

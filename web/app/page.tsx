@@ -517,7 +517,14 @@ function Footer() {
 
 // --------------------------------------------------------------------------- //
 function SimpleBriefing({ data }: { data: AnalyzeResponse }) {
-  const first = data.briefing.markdown.split("\n").find((l) => l.trim() && !l.startsWith("#")) ?? "";
+  const first =
+    data.briefing.markdown
+      .split("\n")
+      .find((l) => {
+        const t = l.trim();
+        return t && !t.startsWith("#") && !t.startsWith("**") && !t.startsWith(">") &&
+          !t.startsWith("*") && !t.startsWith("-") && !t.startsWith("|") && !t.startsWith("---");
+      }) ?? "";
   return (
     <div className="reveal flex flex-col gap-4">
       <h2 className="text-lg font-semibold">{data.event.title}</h2>

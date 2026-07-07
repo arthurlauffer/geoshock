@@ -31,11 +31,11 @@ export default function WorldMap({ events, focused, onSelectEvent }: Props) {
           }
         </Geographies>
 
-        {events.filter((e) => e.lat !== 0 || e.lon !== 0).map((e) => {
+        {events.filter((e) => e.lat !== 0 || e.lon !== 0).map((e, i) => {
           const isFocused = focused?.id === e.id;
           const live = e.kind === "live";
           return (
-            <Marker key={e.id} coordinates={[e.lon, e.lat]} onClick={() => onSelectEvent(e)} style={{ default: { cursor: "pointer" } }}>
+            <Marker key={`${e.id}_${i}`} coordinates={[e.lon, e.lat]} onClick={() => onSelectEvent(e)} style={{ default: { cursor: "pointer" } }}>
               {isFocused && <circle className="pulse-marker" r={7} fill="#fb7185" opacity={0.5} />}
               <circle
                 r={isFocused ? 6 : 4.5}
