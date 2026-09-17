@@ -86,7 +86,13 @@ class GdeltClient:
         for attempt in range(1, self.max_retries + 1):
             self._throttle()
             try:
-                resp = requests.get(_DOC_URL, params=params, timeout=30)
+                # Timeout curto de propósito: a GDELT, quando está limitando
+                # (ou bloqueando) um IP, às vezes não responde em vez de
+                # devolver erro rápido — validado manualmente (requisição
+                # crua ficou 90s+ sem resposta). Falhar rápido e degradar
+                # para lista vazia é melhor do que travar a página do
+                # usuário por 1-2 minutos.
+                resp = requests.get(_DOC_URL, params=params, timeout=8)
                 resp.raise_for_status()
                 # GDELT às vezes devolve HTML de erro com status 200.
                 if not resp.text.strip().startswith("{"):
