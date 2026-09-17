@@ -31,7 +31,9 @@ class GdeltClient:
     ----------
     rate_limit_rps:
         Máximo de requisições por segundo (default lido de
-        ``GDELT_RATE_LIMIT_RPS`` ou 1).
+        ``GDELT_RATE_LIMIT_RPS`` ou 0.2 — validado manualmente em 2026-09: a
+        GDELT devolve HTTP 429 com a mensagem "please limit requests to one
+        every 5 seconds", ou seja, o limite real é 1 req/5s, não 1 req/s).
     max_retries:
         Tentativas em caso de falha de rede (default 3).
     cache_dir:
@@ -47,7 +49,7 @@ class GdeltClient:
         self.rate_limit_rps = (
             rate_limit_rps
             if rate_limit_rps is not None
-            else float(os.getenv("GDELT_RATE_LIMIT_RPS", "1"))
+            else float(os.getenv("GDELT_RATE_LIMIT_RPS", "0.2"))
         )
         self.max_retries = max_retries
         self.cache_dir = Path(cache_dir) if cache_dir else _DEFAULT_CACHE_DIR

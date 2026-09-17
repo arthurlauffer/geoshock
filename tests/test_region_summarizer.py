@@ -67,6 +67,19 @@ def test_gather_verified_events_normalizes_ucdp_rows():
     assert fake.last_countries == region["countries"]
 
 
+def test_gather_verified_events_caps_and_sorts_by_recency():
+    region = get_region("eastern_europe")
+    rows = [
+        {"id": str(i), "country": "Ukraine", "date_start": f"20{10 + i:02d}-01-01", "best": "1"}
+        for i in range(30)
+    ]
+    fake = _FakeUcdpClient(rows)
+    events = rs.gather_verified_events(region, ucdp_client=fake, limit=20)
+    assert len(events) == 20
+    dates = [e["date"] for e in events]
+    assert dates == sorted(dates, reverse=True)  # mais recentes primeiro
+
+
 def test_gather_verified_events_empty_when_no_ucdp_data():
     region = get_region("eastern_europe")
     assert rs.gather_verified_events(region, ucdp_client=_FakeUcdpClient([])) == []
@@ -132,10 +145,11 @@ def test_region_endpoint_structure(monkeypatch):
 
     # GDELT offline determinista: sem artigos.
     monkeypatch.setattr(api_server._collector, "search_gdelt", lambda *a, **k: [])
-    # UCDP/OFAC offline deterministas: sem eventos/sanções (evita download
-    # real de arquivos de dezenas/centenas de MB a cada execução de teste).
-    monkeypatch.setattr(rs, "UcdpClient", lambda *a, **k: _FakeUcdpClient([]))
-    monkeypatch.setattr(rs, "OfacClient", lambda *a, **k: _FakeOfacClient({}))
+    # UCDP/OFAC offline deterministas: sem eventos/sanções. api_server.py
+    # passa os clientes singleton explicitamente (ucdp_client=_ucdp_client),
+    # então o monkeypatch precisa mirar essas instâncias, não as classes.
+    monkeypatch.setattr(api_server, "_ucdp_client", _FakeUcdpClient([]))
+    monkeypatch.setattr(api_server, "_ofac_client", _FakeOfacClient({}))
     # region_detail() não recebe llm_client explícito, então summarize_region()
     # monta um LLMClient() por conta própria a partir do ambiente. Removemos
     # as chaves reais do .env do backend para garantir que o teste nunca
@@ -163,10 +177,10 @@ def test_region_endpoint_merges_verified_events_and_sanctions(monkeypatch):
         "date_start": "2026-01-01 00:00:00.000", "source_headline": "...",
         "country": "Ukraine", "latitude": "50.0", "longitude": "30.0", "best": "12",
     }
-    monkeypatch.setattr(rs, "UcdpClient", lambda *a, **k: _FakeUcdpClient([ucdp_row]))
+    monkeypatch.setattr(api_server, "_ucdp_client", _FakeUcdpClient([ucdp_row]))
     monkeypatch.setattr(
-        rs, "OfacClient",
-        lambda *a, **k: _FakeOfacClient({"russia": [{"id": "1", "name": "X", "programs": ["RUS"]}]}),
+        api_server, "_ofac_client",
+        _FakeOfacClient({"russia": [{"id": "1", "name": "X", "programs": ["RUS"]}]}),
     )
     for env_var in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"):
         monkeypatch.delenv(env_var, raising=False)

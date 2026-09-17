@@ -53,6 +53,7 @@ def aggregate_commodities(live_events: list[dict[str, Any]], region: dict[str, A
 def gather_verified_events(
     region: dict[str, Any],
     ucdp_client: UcdpClient | None = None,
+    limit: int = 20,
 ) -> list[dict[str, Any]]:
     """Eventos de conflito armado confirmados pela UCDP para a região.
 
@@ -60,10 +61,16 @@ def gather_verified_events(
     trazem severidade real (fatalidades estimadas) e coordenadas precisas —
     ver :mod:`modules.data_normalizer`. Falha de rede resulta em lista vazia,
     nunca em dado fabricado.
+
+    Uma única região pode ter centenas de eventos na base candidata da UCDP
+    (ex.: conflitos de longa duração). Retorna os ``limit`` mais recentes —
+    suficiente para o painel e o mapa, sem sobrecarregar a UI nem a resposta.
     """
     client = ucdp_client or UcdpClient()
     rows = client.search_events(countries=region.get("countries"))
-    return normalize_ucdp_events(rows)
+    events = normalize_ucdp_events(rows)
+    events.sort(key=lambda e: e["date"], reverse=True)
+    return events[:limit]
 
 
 def check_sanctions(

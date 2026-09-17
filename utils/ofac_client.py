@@ -49,6 +49,12 @@ class OfacClient:
         self.cache_dir = Path(cache_dir) if cache_dir else _DEFAULT_CACHE_DIR
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache_ttl = cache_ttl
+        # O XML tem ~100MB e o parse sozinho leva alguns segundos — cachear
+        # em memória por instância evita reprocessar a árvore inteira a cada
+        # país consultado (search_by_country é chamado uma vez por país da
+        # região, sequencialmente). Ver api_server.py: um único OfacClient é
+        # reaproveitado entre requisições justamente para aproveitar isto.
+        self._entities_cache: list[dict[str, Any]] | None = None
 
     # ------------------------------------------------------------------ #
     # Download + cache
@@ -122,26 +128,31 @@ class OfacClient:
             )
         return results
 
+    def _entities(self) -> list[dict[str, Any]]:
+        """Entidades parseadas, com cache em memória (ver ``__init__``)."""
+        if self._entities_cache is None:
+            data = self._fetch_xml_bytes()
+            self._entities_cache = self.parse_xml(data) if data else []
+        return self._entities_cache
+
     # ------------------------------------------------------------------ #
     # API pública
     # ------------------------------------------------------------------ #
     def warm_cache(self) -> bool:
-        """Força o download/cache do XML sem filtrar nada.
+        """Força o download + parse do XML, sem filtrar nada.
 
         Usado no boot do servidor (ver ``api_server.py``) para que o
         primeiro clique do usuário numa região não pague o custo do
-        download de ~100MB em linha, dentro da requisição HTTP.
+        download (~100MB) nem do parse (alguns segundos) dentro da
+        requisição HTTP — desde que a MESMA instância seja reaproveitada
+        depois (``api_server.py`` mantém um singleton para isso).
         """
-        return self._fetch_xml_bytes() is not None
+        return len(self._entities()) > 0
 
     def search_by_country(self, country_name: str) -> list[dict[str, Any]]:
         """Entidades sancionadas associadas a um país (nome em inglês)."""
-        data = self._fetch_xml_bytes()
-        if not data:
-            return []
-        entities = self.parse_xml(data)
         target = country_name.strip().lower()
         return [
-            e for e in entities
+            e for e in self._entities()
             if any((c or "").strip().lower() == target for c in e["countries"])
         ]

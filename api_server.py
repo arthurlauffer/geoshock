@@ -48,7 +48,10 @@ def _warm_external_caches() -> None:
     silenciosa — os clientes voltam a tentar (e cacheiam) na primeira
     chamada real de qualquer forma.
     """
-    for name, warm in (("UCDP", UcdpClient().warm_cache), ("OFAC", OfacClient().warm_cache)):
+    # Aquece as MESMAS instâncias singleton usadas depois pelas requisições
+    # (ver _ucdp_client/_ofac_client abaixo) — aquecer instâncias descartáveis
+    # não ajudaria em nada, já que o cache em memória do OFAC é por instância.
+    for name, warm in (("UCDP", _ucdp_client.warm_cache), ("OFAC", _ofac_client.warm_cache)):
         try:
             ok = warm()
             logger.info("Cache de %s pré-aquecido: %s", name, "ok" if ok else "sem dados (offline)")
@@ -70,9 +73,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Singletons reaproveitados entre requisições (motor de similaridade é caro).
+# Singletons reaproveitados entre requisições. Motor de similaridade e os
+# clientes UCDP/OFAC são caros de inicializar (o OFAC mantém ~100MB de dados
+# parseados em memória) — instanciar um novo a cada requisição anularia o
+# ganho do pré-aquecimento no boot (ver _warm_external_caches).
 _engine: SimilarityEngine | None = None
 _collector = collector.Collector()
+_ucdp_client = UcdpClient()
+_ofac_client = OfacClient()
 
 
 def get_engine() -> SimilarityEngine:
@@ -152,8 +160,8 @@ def region_detail(region_id: str) -> dict[str, Any]:
     # OFAC (sanções confirmadas oficialmente) — complementam o "pulso" da
     # GDELT com dados curados/estruturados. Falha de rede em qualquer uma
     # resulta em lista vazia / sanções não confirmadas, nunca em erro 500.
-    verified_events = region_summarizer.gather_verified_events(region)
-    sanctions = region_summarizer.check_sanctions(region)
+    verified_events = region_summarizer.gather_verified_events(region, ucdp_client=_ucdp_client)
+    sanctions = region_summarizer.check_sanctions(region, ofac_client=_ofac_client)
 
     all_events = live_events + verified_events
     commodities = region_summarizer.aggregate_commodities(all_events, region)

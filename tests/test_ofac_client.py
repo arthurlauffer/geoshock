@@ -112,3 +112,28 @@ def test_search_without_cache_or_network_returns_empty(tmp_path, monkeypatch):
     monkeypatch.setattr(requests, "get", _raise)
     client = OfacClient(cache_dir=tmp_path)
     assert client.search_by_country("Russia") == []
+
+
+def test_search_by_country_reparses_xml_only_once_per_instance(tmp_path, monkeypatch):
+    """Guarda de regressão: consultar vários países não deve reprocessar o
+    XML inteiro a cada chamada (bug real medido em produção: 6 países no
+    mesmo request levavam ~24s por reparse repetido de um arquivo de
+    ~100MB; com o cache em memória, cai para uma única passada).
+    """
+    (tmp_path / "sdn_entities.xml").write_bytes(_SAMPLE_XML.encode("utf-8"))
+    client = OfacClient(cache_dir=tmp_path)
+
+    calls = {"n": 0}
+    original_parse = OfacClient.parse_xml
+
+    def _counting_parse(xml_bytes):
+        calls["n"] += 1
+        return original_parse(xml_bytes)
+
+    monkeypatch.setattr(OfacClient, "parse_xml", staticmethod(_counting_parse))
+
+    client.search_by_country("Russia")
+    client.search_by_country("Iran")
+    client.search_by_country("Brazil")
+
+    assert calls["n"] == 1
