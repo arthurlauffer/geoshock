@@ -129,6 +129,15 @@ class UcdpClient:
     # ------------------------------------------------------------------ #
     # API pública
     # ------------------------------------------------------------------ #
+    def warm_cache(self) -> bool:
+        """Força o download/cache do CSV sem filtrar nada.
+
+        Usado no boot do servidor (ver ``api_server.py``) para que o
+        primeiro clique do usuário numa região não pague o custo do
+        download de ~8MB em linha, dentro da requisição HTTP.
+        """
+        return self._fetch_csv_text() is not None
+
     def search_events(
         self,
         countries: list[str] | None = None,

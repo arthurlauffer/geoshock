@@ -14,7 +14,8 @@ export interface GeoEvent {
   commodities_affected: string[];
   source: string;
   verified_outcomes?: Record<string, string>;
-  kind?: "curated" | "live";
+  kind?: "curated" | "live" | "verified";
+  fatalities_best?: number;
 }
 
 export interface SimilarEvent {
@@ -93,11 +94,20 @@ export interface Region {
   countries: string[];
 }
 
+export interface SanctionsCheck {
+  active: boolean;
+  count: number;
+  programs: string[];
+  sample_names: string[];
+}
+
 export interface RegionDetail {
   region: Region & { gdelt_query?: string };
   summary: string;
   risk_level: "alto" | "médio" | "baixo";
   live_events: GeoEvent[];
+  verified_events: GeoEvent[];
   commodities_at_risk: string[];
-  meta: { offline: boolean; n_live: number };
+  sanctions_confirmed: SanctionsCheck;
+  meta: { offline: boolean; n_live: number; n_verified: number };
 }

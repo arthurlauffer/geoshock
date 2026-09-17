@@ -125,6 +125,15 @@ class OfacClient:
     # ------------------------------------------------------------------ #
     # API pública
     # ------------------------------------------------------------------ #
+    def warm_cache(self) -> bool:
+        """Força o download/cache do XML sem filtrar nada.
+
+        Usado no boot do servidor (ver ``api_server.py``) para que o
+        primeiro clique do usuário numa região não pague o custo do
+        download de ~100MB em linha, dentro da requisição HTTP.
+        """
+        return self._fetch_xml_bytes() is not None
+
     def search_by_country(self, country_name: str) -> list[dict[str, Any]]:
         """Entidades sancionadas associadas a um país (nome em inglês)."""
         data = self._fetch_xml_bytes()

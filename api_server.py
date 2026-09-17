@@ -14,7 +14,10 @@ Execução::
 
 from __future__ import annotations
 
+import logging
 import os
+import threading
+from contextlib import asynccontextmanager
 from typing import Any, Optional
 
 from dotenv import load_dotenv
@@ -28,11 +31,38 @@ from modules.briefing_generator import LLMClient
 from modules.similarity_engine import SimilarityEngine
 from utils.fred_client import FredClient
 from utils.geocoder import geocode_event
+from utils.ofac_client import OfacClient
+from utils.ucdp_client import UcdpClient
 from utils.validators import EVENT_TYPES, ValidationError
 
 load_dotenv()
+logger = logging.getLogger("geoshock.api")
 
-app = FastAPI(title="GeoShock API", version="1.0.0")
+
+def _warm_external_caches() -> None:
+    """Pré-baixa UCDP (~8MB) e OFAC (~100MB) em background no boot.
+
+    Sem isso, o primeiro clique do usuário numa região pagaria esse download
+    dentro da própria requisição HTTP (minutos de espera). Roda numa thread
+    separada para não atrasar a subida do servidor; falha de rede aqui é
+    silenciosa — os clientes voltam a tentar (e cacheiam) na primeira
+    chamada real de qualquer forma.
+    """
+    for name, warm in (("UCDP", UcdpClient().warm_cache), ("OFAC", OfacClient().warm_cache)):
+        try:
+            ok = warm()
+            logger.info("Cache de %s pré-aquecido: %s", name, "ok" if ok else "sem dados (offline)")
+        except Exception:
+            logger.exception("Falha ao pré-aquecer cache de %s", name)
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    threading.Thread(target=_warm_external_caches, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="GeoShock API", version="1.0.0", lifespan=_lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # dev: liberado. Em produção, restringir ao domínio do front.

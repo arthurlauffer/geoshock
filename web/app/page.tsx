@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   ArrowsClockwise,
@@ -28,6 +28,7 @@ import type {
 } from "@/lib/types";
 import AnalysisPanel from "@/components/AnalysisPanel";
 import RegionPanel from "@/components/RegionPanel";
+import { MARKER_COLORS, MARKER_LABELS } from "@/lib/markerColors";
 
 // O mapa usa APIs de browser (SVG/medições), carrega só no cliente.
 const WorldMap = dynamic(() => import("@/components/WorldMap"), { ssr: false });
@@ -127,6 +128,28 @@ export default function Home() {
     setSelected(e);
   }, []);
 
+  // Eventos plotados no mapa: base curada + o evento em foco (mesmo quando
+  // vem de fonte manual/GDELT e não está na base curada) +, com uma região
+  // aberta, os eventos ao vivo (GDELT) e verificados (UCDP) dela.
+  const displayedMapEvents = useMemo(() => {
+    const combined = [...mapEvents];
+    const seen = new Set(combined.map((e) => e.id));
+    const focused = result?.event ?? selected;
+    if (focused && !seen.has(focused.id)) {
+      combined.push(focused);
+      seen.add(focused.id);
+    }
+    if (regionDetail) {
+      for (const e of [...regionDetail.live_events, ...regionDetail.verified_events]) {
+        if (!seen.has(e.id)) {
+          combined.push(e);
+          seen.add(e.id);
+        }
+      }
+    }
+    return combined;
+  }, [mapEvents, result, selected, regionDetail]);
+
   return (
     <div className="min-h-[100dvh] px-4 py-5 md:px-8 md:py-7 flex flex-col gap-5 max-w-[1480px] mx-auto w-full">
       <Header health={health} viewMode={viewMode} setViewMode={setViewMode} />
@@ -144,6 +167,7 @@ export default function Home() {
           onRegenerate={() => selected && runAnalysis(selected, nAnalogs)}
           loading={loading}
           regions={regions}
+          selectedRegionId={regionDetail?.region.id ?? null}
           onSelectRegion={openRegion}
         />
 
@@ -154,17 +178,17 @@ export default function Home() {
                 <GlobeHemisphereWest size={14} className="text-[color:var(--accent)]" />
                 Distribuição geográfica
               </p>
-              <div className="flex gap-4 text-xs num text-zinc-400">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#fb7185]" /> Em foco
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#7dd3fc]" /> Curados
-                </span>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs num text-zinc-400">
+                {(Object.keys(MARKER_LABELS) as (keyof typeof MARKER_LABELS)[]).map((kind) => (
+                  <span key={kind} className="inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ background: MARKER_COLORS[kind] }} />
+                    {MARKER_LABELS[kind]}
+                  </span>
+                ))}
               </div>
             </div>
             <WorldMap
-              events={mapEvents}
+              events={displayedMapEvents}
               focused={result?.event ?? selected}
               onSelectEvent={(e) => selectEvent(e)}
             />
@@ -258,11 +282,15 @@ interface SidebarProps {
   onRegenerate: () => void;
   loading: boolean;
   regions: Region[];
+  selectedRegionId: string | null;
   onSelectRegion: (id: string) => void;
 }
 
 function Sidebar(props: SidebarProps) {
-  const { mode, setMode, events, eventTypes, selected, setSelected, nAnalogs, setNAnalogs, onRegenerate, loading, regions, onSelectRegion } = props;
+  const {
+    mode, setMode, events, eventTypes, selected, setSelected, nAnalogs, setNAnalogs,
+    onRegenerate, loading, regions, selectedRegionId, onSelectRegion,
+  } = props;
 
   return (
     <aside className="panel p-5 flex flex-col gap-6 lg:sticky lg:top-5">
@@ -270,7 +298,11 @@ function Sidebar(props: SidebarProps) {
         <p className="eyebrow mb-2">Regiões</p>
         <div className="grid grid-cols-2 gap-1.5">
           {regions.map((r) => (
-            <button key={r.id} className="seg-item" onClick={() => onSelectRegion(r.id)}>
+            <button
+              key={r.id}
+              className={`seg-item ${selectedRegionId === r.id ? "seg-active" : ""}`}
+              onClick={() => onSelectRegion(r.id)}
+            >
               {r.name}
             </button>
           ))}
