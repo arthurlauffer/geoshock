@@ -118,15 +118,29 @@ def region_detail(region_id: str) -> dict[str, Any]:
         ev["kind"] = "live"
         live_events.append(ev)
 
-    commodities = region_summarizer.aggregate_commodities(live_events, region)
-    summary = region_summarizer.summarize_region(region, live_events, commodities)
+    # Camada de verificação: UCDP (severidade real de conflito armado) e
+    # OFAC (sanções confirmadas oficialmente) — complementam o "pulso" da
+    # GDELT com dados curados/estruturados. Falha de rede em qualquer uma
+    # resulta em lista vazia / sanções não confirmadas, nunca em erro 500.
+    verified_events = region_summarizer.gather_verified_events(region)
+    sanctions = region_summarizer.check_sanctions(region)
+
+    all_events = live_events + verified_events
+    commodities = region_summarizer.aggregate_commodities(all_events, region)
+    summary = region_summarizer.summarize_region(region, all_events, commodities)
     return {
         "region": region,
         "summary": summary["summary"],
         "risk_level": summary["risk_level"],
         "live_events": live_events,
+        "verified_events": verified_events,
         "commodities_at_risk": commodities,
-        "meta": {"offline": summary["offline"], "n_live": len(live_events)},
+        "sanctions_confirmed": sanctions,
+        "meta": {
+            "offline": summary["offline"],
+            "n_live": len(live_events),
+            "n_verified": len(verified_events),
+        },
     }
 
 

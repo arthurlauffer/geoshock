@@ -14,6 +14,10 @@ from typing import Any
 
 from modules import preprocessor
 from modules.briefing_generator import LLMClient
+from modules.data_normalizer import normalize_ofac_check, normalize_ucdp_events
+from utils.geocoder import country_name_from_iso
+from utils.ofac_client import OfacClient
+from utils.ucdp_client import UcdpClient
 
 _MAPPING = Path(__file__).resolve().parent.parent / "data" / "commodity_mapping.json"
 
@@ -44,6 +48,47 @@ def aggregate_commodities(live_events: list[dict[str, Any]], region: dict[str, A
         if default:
             return list(default)
     return ["crude_oil", "gold"]
+
+
+def gather_verified_events(
+    region: dict[str, Any],
+    ucdp_client: UcdpClient | None = None,
+) -> list[dict[str, Any]]:
+    """Eventos de conflito armado confirmados pela UCDP para a região.
+
+    Diferente dos eventos ``kind="live"`` (GDELT, keyword-matched), estes
+    trazem severidade real (fatalidades estimadas) e coordenadas precisas —
+    ver :mod:`modules.data_normalizer`. Falha de rede resulta em lista vazia,
+    nunca em dado fabricado.
+    """
+    client = ucdp_client or UcdpClient()
+    rows = client.search_events(countries=region.get("countries"))
+    return normalize_ucdp_events(rows)
+
+
+def check_sanctions(
+    region: dict[str, Any],
+    ofac_client: OfacClient | None = None,
+) -> dict[str, Any]:
+    """Confirmação OFAC de sanções ativas para os países da região.
+
+    Consulta cada país da região pela sua lista de sanções (SDN); agrega os
+    resultados numa única confirmação (ver
+    :func:`modules.data_normalizer.normalize_ofac_check`).
+    """
+    client = ofac_client or OfacClient()
+    entities: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for iso in region.get("countries") or []:
+        name = country_name_from_iso(iso)
+        if not name:
+            continue
+        for ent in client.search_by_country(name):
+            ent_id = ent.get("id")
+            if ent_id not in seen_ids:
+                seen_ids.add(ent_id)
+                entities.append(ent)
+    return normalize_ofac_check(entities)
 
 
 def risk_level(live_events: list[dict[str, Any]]) -> str:

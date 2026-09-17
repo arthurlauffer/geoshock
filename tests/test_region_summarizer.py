@@ -27,6 +27,75 @@ def test_aggregate_commodities_empty_falls_back_to_region_default():
     assert commodities  # não vazio
 
 
+class _FakeUcdpClient:
+    """Substitui utils.ucdp_client.UcdpClient em testes (sem rede)."""
+
+    def __init__(self, rows):
+        self._rows = rows
+        self.last_countries = None
+
+    def search_events(self, countries=None, min_date=None):
+        self.last_countries = countries
+        return self._rows
+
+
+class _FakeOfacClient:
+    """Substitui utils.ofac_client.OfacClient em testes (sem rede)."""
+
+    def __init__(self, by_country):
+        self._by_country = by_country
+        self.queried = []
+
+    def search_by_country(self, country_name):
+        self.queried.append(country_name)
+        return self._by_country.get(country_name.lower(), [])
+
+
+def test_gather_verified_events_normalizes_ucdp_rows():
+    region = get_region("eastern_europe")
+    rows = [{
+        "id": "700001", "conflict_name": "Government of Ukraine - Government of Russia",
+        "date_start": "2022-02-24 00:00:00.000",
+        "source_headline": "Russian forces invaded Ukraine.",
+        "country": "Ukraine", "latitude": "50.45", "longitude": "30.52", "best": "45",
+    }]
+    fake = _FakeUcdpClient(rows)
+    events = rs.gather_verified_events(region, ucdp_client=fake)
+    assert len(events) == 1
+    assert events[0]["kind"] == "verified"
+    assert events[0]["id"] == "ucdp_700001"
+    assert fake.last_countries == region["countries"]
+
+
+def test_gather_verified_events_empty_when_no_ucdp_data():
+    region = get_region("eastern_europe")
+    assert rs.gather_verified_events(region, ucdp_client=_FakeUcdpClient([])) == []
+
+
+def test_check_sanctions_active_when_ofac_has_matches():
+    region = get_region("eastern_europe")  # inclui RU (Rússia)
+    fake = _FakeOfacClient({"russia": [{"id": "1", "name": "SAFAROV, Azamat", "programs": ["CYBER2"]}]})
+    result = rs.check_sanctions(region, ofac_client=fake)
+    assert result["active"] is True
+    assert result["count"] == 1
+    assert "russia" in fake.queried
+
+
+def test_check_sanctions_inactive_when_no_matches():
+    region = get_region("eastern_europe")
+    result = rs.check_sanctions(region, ofac_client=_FakeOfacClient({}))
+    assert result["active"] is False
+    assert result["count"] == 0
+
+
+def test_check_sanctions_deduplicates_entities_across_countries():
+    region = get_region("eastern_europe")  # UA, RU, PL, BY, MD, RO
+    same_entity = {"id": "1", "name": "DUPLICATED CO", "programs": ["RUS"]}
+    fake = _FakeOfacClient({"russia": [same_entity], "belarus": [same_entity]})
+    result = rs.check_sanctions(region, ofac_client=fake)
+    assert result["count"] == 1  # mesmo id em 2 países conta uma vez só
+
+
 def test_risk_level_scales_with_volume():
     assert rs.risk_level([]) == "baixo"
     many = _events() * 4
@@ -63,6 +132,10 @@ def test_region_endpoint_structure(monkeypatch):
 
     # GDELT offline determinista: sem artigos.
     monkeypatch.setattr(api_server._collector, "search_gdelt", lambda *a, **k: [])
+    # UCDP/OFAC offline deterministas: sem eventos/sanções (evita download
+    # real de arquivos de dezenas/centenas de MB a cada execução de teste).
+    monkeypatch.setattr(rs, "UcdpClient", lambda *a, **k: _FakeUcdpClient([]))
+    monkeypatch.setattr(rs, "OfacClient", lambda *a, **k: _FakeOfacClient({}))
     # region_detail() não recebe llm_client explícito, então summarize_region()
     # monta um LLMClient() por conta própria a partir do ambiente. Removemos
     # as chaves reais do .env do backend para garantir que o teste nunca
@@ -74,5 +147,32 @@ def test_region_endpoint_structure(monkeypatch):
     assert out["region"]["id"] == "middle_east"
     assert out["commodities_at_risk"]
     assert "summary" in out and len(out["summary"]) > 20
+    assert out["verified_events"] == []
+    assert out["sanctions_confirmed"]["active"] is False
     assert out["meta"]["n_live"] == 0
+    assert out["meta"]["n_verified"] == 0
     assert out["meta"]["offline"] is True
+
+
+def test_region_endpoint_merges_verified_events_and_sanctions(monkeypatch):
+    import api_server
+
+    monkeypatch.setattr(api_server._collector, "search_gdelt", lambda *a, **k: [])
+    ucdp_row = {
+        "id": "700001", "conflict_name": "Ataque em zona fronteiriça",
+        "date_start": "2026-01-01 00:00:00.000", "source_headline": "...",
+        "country": "Ukraine", "latitude": "50.0", "longitude": "30.0", "best": "12",
+    }
+    monkeypatch.setattr(rs, "UcdpClient", lambda *a, **k: _FakeUcdpClient([ucdp_row]))
+    monkeypatch.setattr(
+        rs, "OfacClient",
+        lambda *a, **k: _FakeOfacClient({"russia": [{"id": "1", "name": "X", "programs": ["RUS"]}]}),
+    )
+    for env_var in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(env_var, raising=False)
+
+    out = api_server.region_detail("eastern_europe")
+    assert out["meta"]["n_verified"] == 1
+    assert out["verified_events"][0]["kind"] == "verified"
+    assert out["sanctions_confirmed"]["active"] is True
+    assert out["sanctions_confirmed"]["count"] == 1

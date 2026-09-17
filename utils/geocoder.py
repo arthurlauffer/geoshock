@@ -70,6 +70,24 @@ def iso_from_country_name(name: str) -> str | None:
 _iso_from_name = iso_from_country_name
 
 
+@lru_cache(maxsize=1)
+def _iso_to_name() -> dict[str, str]:
+    """Inverte :data:`_NAME_TO_ISO` (ISO2 -> primeiro nome encontrado)."""
+    inverted: dict[str, str] = {}
+    for name, iso in _NAME_TO_ISO.items():
+        inverted.setdefault(iso, name)
+    return inverted
+
+
+def country_name_from_iso(code: str) -> str | None:
+    """Nome de país (inglês, minúsculo) a partir do ISO2, ou None.
+
+    Usado para consultar fontes que identificam país por nome em vez de
+    código (ex.: :class:`utils.ofac_client.OfacClient`).
+    """
+    return _iso_to_name().get((code or "").strip().upper())
+
+
 def geocode_event(event: dict[str, Any]) -> dict[str, Any]:
     """Devolve cópia do evento com lat/lon preenchidos quando possível."""
     out = dict(event)
